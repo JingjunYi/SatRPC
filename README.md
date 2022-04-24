@@ -1,10 +1,19 @@
 ### Comand for solving RPC: 
+
 ```
 python main.py
 ```
 
 ### Requirement:
 
+```
+numpy
+tqdm
+opencv-python
+scipy
+matplotlib
+gdal
+```
 
 ### Arguments:
 
