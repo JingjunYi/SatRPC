@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from tqdm import tqdm
 
 
 class RPC():
@@ -180,4 +181,116 @@ class RPC():
         self.c = self.c.reshape(-1, 1)
         self.d = self.d.reshape(-1, 1)
         paras = np.hstack((self.a, self.b, self.c, self.d))
-        np.save(paras_pth, paras)
+        np.save(paras_pth, paras) 
+        
+        
+    def load_paras(self, offset, paras):
+        self.a = paras[:, 0]
+        self.b = paras[:, 1]
+        self.c = paras[:, 2]
+        self.d = paras[:, 3]
+        self.r_g = offset[0]
+        self.c_g = offset[1]
+        self.X_g = offset[2]
+        self.Y_g = offset[3]
+        self.Z_g = offset[4]
+        self.r_s = offset[5]
+        self.c_s = offset[6]
+        self.X_s = offset[7]
+        self.Y_s = offset[8]
+        self.Z_s = offset[9]
+        
+        
+    def get_photo_loc(self, N, j2w_rot, b2j_rot, wgs, gps_p):
+        # external parameters are obtained according to the line number N
+        # then the image space coordinates are calculated according to the collinearity equations
+        XYZ = wgs
+        XYZ_s = gps_p[N]
+        R = np.dot(j2w_rot[N], b2j_rot[N])
+        XYZ_get = np.dot(np.linalg.inv(R), (XYZ - XYZ_s))
+        
+        return (-XYZ_get[0] / XYZ_get[2]), (-XYZ_get[1] / XYZ_get[2])
+
+
+    def dichotomy_check(self, check_points, gps_p, j2w_rot, b2j_rot, u_vec):
+        # window dichotomy method for precision evaluation for every point
+        check_x = []
+        check_y = []
+        invalid = []
+        line_num = gps_p.shape[0]
+        for i in range(len(check_points)):
+            wgs = check_points[i, :]
+            Ns = 0
+            Ne = line_num - 1
+            iter_flag = True
+        
+            while iter_flag:
+                N_ = int((Ns + Ne) / 2)
+                xs, ys = self.get_photo_loc(Ns, j2w_rot, b2j_rot, wgs, gps_p)
+                x_, y_ = self.get_photo_loc(N_, j2w_rot, b2j_rot, wgs, gps_p)
+                xe, ye = self.get_photo_loc(Ne, j2w_rot, b2j_rot, wgs, gps_p)
+                # find Ns, Ne according to adjust criterion
+                if xs < 0 and x_< 0 and xe < 0:
+                    invalid.append(i)
+                    iter_flag = False
+                elif xs > 0 and x_ > 0 and xe > 0:
+                    invalid.append(i)
+                    iter_flag = False
+                else:
+                    if(xs * x_ <= 0):
+                        Ne = N_
+                    elif(x_ * xe <= 0):
+                        Ns = N_
+                    else:
+                        Ns = int((Ns + N_) / 2)
+                        Ne = int((Ne + N_) / 2)
+                # adjust quit condition
+                if abs(Ne - Ns) <= 1:
+                    iter_flag = False
+                    check_x.append(int(N_))
+                    check_y.append(int(np.argmin(np.abs(y_ - u_vec[1,:]))))
+                       
+        return np.vstack((check_x, check_y)).transpose().astype(np.float), np.delete(check_points, invalid, axis=0)
+    
+    
+    def norm_offset(self, photo_check, ground_check, offset):
+        # normalization based on RPC offset parameters (c_g, r_g, c_s, r_s, X_g, X_s...)
+        photo_check[:, 0] = (photo_check[:, 0] - offset[0]) / offset[5]
+        photo_check[:, 1] = (photo_check[:, 1] - offset[1]) / offset[6]
+        ground_check[:, 0] = (ground_check[:, 0] - offset[2]) / offset[7]
+        ground_check[:, 1] = (ground_check[:, 1] - offset[3]) / offset[8]
+        ground_check[:, 2] = (ground_check[:, 2] - offset[4]) / offset[9]
+        
+        return photo_check, ground_check
+    
+    
+    def denorm_offset(self, photo_check, ground_check, offset):
+        # denormalization based on RPC offset parameters
+        photo_check[:, 0] = (photo_check[:, 0] * offset[5]) + offset[0]
+        photo_check[:, 1] = (photo_check[:, 1] * offset[6]) + offset[1]
+        if ground_check.shape[0]:
+            ground_check[:, 0] = (ground_check[:, 0] * offset[7]) + offset[2]
+            ground_check[:, 1] = (ground_check[:, 1] * offset[8]) + offset[3]
+            ground_check[:, 2] = (ground_check[:, 2] * offset[9]) + offset[4]
+        
+        return photo_check, ground_check
+    
+    
+    def pred(self, ground_check):
+        # Direct transformation to predict image space coordinates
+        X = ground_check[:, 0].reshape(-1, 1)
+        Y = ground_check[:, 1].reshape(-1, 1)
+        Z = ground_check[:, 2].reshape(-1, 1)
+        l = len(X)
+        vec = np.hstack([np.ones((l, 1)),
+                         Z, Y, X,
+                         Z * Y, Z * X, Y * X,
+                         Z * Z, Y * Y, X * X,
+                         Z * Y * X, Z * Z * Y, Z * Z * X,
+                         Y * Y * Z, Y * Y * X, Z * X * X,
+                         Y * X * X, Z * Z * Z, Y * Y * Y,
+                         X * X * X])
+        R = np.true_divide(np.dot(vec, self.a),np.dot(vec, self.b))
+        C = np.true_divide(np.dot(vec, self.c),np.dot(vec, self.d))
+        
+        return np.vstack((R, C)).transpose()

@@ -72,12 +72,12 @@ def get_u_vec(direct_data):
                            -np.ones((1, len(direct_data)))])
     
 
-def get_m_factor(final_u_vec, gps_loc, height):
+def get_m_factor(final_u_vec, gps_p, height):
     '''
     Obtain the scale factor for the final coordinate conversion
     input:
         final_u_vec(np.array(3, 1)): rotated visual vector
-        gps_loc(np.array(3, 1)): gps position of ZY3
+        gps_p(np.array(3, 1)): gps position of ZY3
         height(float): elevation of grid point
     output:
         m(float): scale factor m = u * f 
@@ -87,8 +87,8 @@ def get_m_factor(final_u_vec, gps_loc, height):
     B = 6356752.3142 + height
     # construct and solve quadratic function, coefficients a b c
     a = (final_u_vec[0] * final_u_vec[0] + final_u_vec[1] * final_u_vec[1]) / (A * A) + final_u_vec[2] * final_u_vec[2] / (B * B)
-    b = 2 * ((final_u_vec[0] * gps_loc[0] + final_u_vec[1] * gps_loc[1]) / (A * A) + final_u_vec[2] * gps_loc[2]/(B*B))
-    c = (gps_loc[0] * gps_loc[0] + gps_loc[1] * gps_loc[1]) / (A * A) + gps_loc[2] * gps_loc[2] / (B * B) - 1
+    b = 2 * ((final_u_vec[0] * gps_p[0] + final_u_vec[1] * gps_p[1]) / (A * A) + final_u_vec[2] * gps_p[2]/(B*B))
+    c = (gps_p[0] * gps_p[0] + gps_p[1] * gps_p[1]) / (A * A) + gps_p[2] * gps_p[2] / (B * B) - 1
     delta = b * b - 4 * a * c
     if a == 0:
         if b != 0:
@@ -111,7 +111,7 @@ def get_m_factor(final_u_vec, gps_loc, height):
         
 
     
-def get_wgs84_vec(u_vec, u_rot, b2j_rot, j2w_rot, gps_loc, height):
+def get_wgs84_vec(u_vec, u_rot, b2j_rot, j2w_rot, gps_p, height):
     '''
     transform visual vector to coordinate vectors of grid points in WGS84
     input:
@@ -119,18 +119,18 @@ def get_wgs84_vec(u_vec, u_rot, b2j_rot, j2w_rot, gps_loc, height):
         u_rot(np.array(3, 3)): camera to body rotation matrix
         b2j_rot(np.array(3, 3)): body to J200(orbit) rotation matrix
         j2w_rot(np.array(3, 3)): J2000 to WGS84 rotation matrix
-        gps_loc(np.array(1, 3)): gps position of ZY3
+        gps_p(np.array(1, 3)): gps position of ZY3
         height(float): elevation of grid point
     output:
         wgs84_vec(np.array(3, 1)): coordinate vector in WGS84
     '''
     u_vec = u_vec.reshape(-1, 1)
-    gps_loc = gps_loc.reshape(-1, 1)
+    gps_p = gps_p.reshape(-1, 1)
     inter_u_vec = np.dot(u_rot, u_vec)
     inter_u_vec = np.dot(b2j_rot, inter_u_vec)
     final_u_vec = np.dot(j2w_rot, inter_u_vec)
-    m = get_m_factor(final_u_vec, gps_loc, height) 
-    wgs84_vec = gps_loc + final_u_vec * m
+    m = get_m_factor(final_u_vec, gps_p, height) 
+    wgs84_vec = gps_p + final_u_vec * m
     
     return wgs84_vec
     
@@ -141,7 +141,7 @@ def wgs2blh(ground_points):
     input:
         ground_points: WGS coordinates
     output:
-        blh: BLH coordinates
+        BLH: BLH coordinates
     '''
     a = 6378137
     b = 6356752.314
@@ -149,15 +149,14 @@ def wgs2blh(ground_points):
     e2 = (a * a - b * b) / (a * a)
     L = np.arctan(ground_points[:, 1] / ground_points[:, 0])
     B = np.arctan(ground_points[:, 2] / np.sqrt(ground_points[:, 0] ** 2 + ground_points[:, 1] ** 2))
-
+    
     for i in range(0, 100):
         N = a / np.sqrt(1 - e2 * (np.sin(B) ** 2))
         H = ground_points[:, 2] / np.sin(B) - N * (1 - e2)
 
         Bn = np.arctan(ground_points[:, 2] * (N + H) / ((N * (1 - e2) + H) * np.sqrt(ground_points[:, 0] ** 2 + ground_points[:, 1] ** 2)))
-
+        
         if np.max(np.abs(B - Bn)) < 1e-7:
-            print('WGS84 to BLH transformation done.')
             break
         B = Bn
 
@@ -171,6 +170,33 @@ def wgs2blh(ground_points):
     BLH[:, 2] = H
 
     return BLH
+
+
+def blh2wgs(BLH):
+    '''
+    transform BLH coordinates to WGS84 coordinates
+    input:
+        BLH: BLH coordinates
+    output:
+        ground_points: WGS coordinates
+    '''
+    a = 6378137.0000
+    b = 6356752.3141
+    pi = 3.1415926
+    e2 = 1 - (b / a) ** 2
+    
+    B = BLH[:, 0]
+    L = BLH[:, 1]
+    H = BLH[:, 2]
+    
+    L = L * pi / 180
+    B = B * pi / 180
+    
+    N = a / np.sqrt(1 - e2 * np.sin(B) ** 2)
+    x = (N + H) * np.cos(B) * np.cos(L)
+    y = (N + H) * np.cos(B) * np.sin(L)
+    z = (N * (1 - e2) + H) * np.sin(B)
+    return np.vstack((x, y, z)).transpose()
 
 
 
