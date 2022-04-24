@@ -71,12 +71,12 @@ def preprocess(args):
     time4 = time()
     time_pth = os.path.join(os.getcwd(), args.inter_dir, 'time_utc.txt').replace('/', '\\')
     j2wrot_pth = os.path.join(os.getcwd(), args.inter_dir, 'j2w_rot.txt').replace('/', '\\')
-    # import matlab
-    # import matlab.engine
-    # print('Matlab core activated.')
-    # engine = matlab.engine.start_matlab()
-    # print('Calculating J200 to WGS84 rotation matrices...')
-    # engine.j2wrot(time_pth, j2wrot_pth, nargout=0)
+    import matlab
+    import matlab.engine
+    print('Matlab core activated.')
+    engine = matlab.engine.start_matlab()
+    print('Calculating J200 to WGS84 rotation matrices...')
+    engine.j2wrot(time_pth, j2wrot_pth, nargout=0)
     time5 = time()
     print('Rotation matrices saved, matlab processing {:.3f}ms.'.format((time5 - time4) * 1000))
     print('\n')
@@ -155,7 +155,7 @@ def generate_control(args):
             for i in range(args.ctrl_grid_m + 1)]
     h_layer = [args.height_min + i * (args.height_max - args.height_min) / (args.ctrl_layer - 1)
                for i in range(args.ctrl_layer)]
-    pool = Pool(1)
+    pool = Pool(6)
     ground_points = np.array([])
     count = 0
     def grid_function(range_zip, height):
