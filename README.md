@@ -40,10 +40,9 @@ final_dir: path of final result
 
 ### To be done:
 
-```
 - [ ] Precision assessment
 - [ ] Split solvement
-```
+
 
 ### Other information:
 
