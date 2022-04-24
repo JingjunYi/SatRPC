@@ -1,7 +1,7 @@
-Comand for solving RPC: 
-###
+### Comand for solving RPC: 
+```
 python main.py
-###
+```
 
 Arguments:
 
