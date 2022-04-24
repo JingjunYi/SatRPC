@@ -16,10 +16,10 @@ parser = argparse.ArgumentParser(description='RPC')
 parser.add_argument('--ctrl_grid_m', type=int, default=10, help='number of control grid(m,n)')
 parser.add_argument('--ctrl_grid_n', type=int, default=10, help='number of control grid(m,n)')
 parser.add_argument('--ctrl_layer', type=int, default=6, help='layer number of control grid')
-parser.add_argument('--check_grid_m', type=int, default=20)
-parser.add_argument('--check_grid_n', type=int, default=20)
-parser.add_argument('--max_iter', type=int, default=20, help='Maximum number of RPC iterations')
-parser.add_argument('--threshold', type=float, default=0.001, help='threshold to exit iteration')
+parser.add_argument('--check_grid_m', type=int, default=20, help='number of eval grid(m,n)')
+parser.add_argument('--check_grid_n', type=int, default=20, help='number of eval grid(m,n)')
+parser.add_argument('--max_iter', type=int, default=20, help='maximum number of RPC iterations')
+parser.add_argument('--threshold', type=float, default=0.0015, help='threshold to exit iteration')
 
 parser.add_argument('--data_dir', type=str, default='data/data_ZY3', help='path of data')
 parser.add_argument('--dem_pth', type=str, default='data/dem/n35_e114_1arc_v3.tif', help='path of dem dir')
@@ -205,6 +205,11 @@ def solve_rpc(args):
     if solve:
         rpc.save_result(os.path.join(args.final_dir, 'result.txt'))
         rpc.save_data(args.final_dir)
+        # save area of ground points for eval
+        np.save(os.path.join(args.inter_dir, 'ground_area.npy'), np.array([np.max(args.ground_points[:,0]), 
+                                                                    np.min(args.ground_points[:,0]), 
+                                                                    np.max(args.ground_points[:,1]), 
+                                                                    np.min(args.ground_points[:,1])]))
     print('Solved result saved.')
     time2 = time()
     print('Finish RPC parameters solving in {:.3f}ms!'.format((time2 - time0) * 1000))
