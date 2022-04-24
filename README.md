@@ -38,6 +38,13 @@ inter_dir: path of itermdiate result
 final_dir: path of final result
 ```
 
+### To be done:
+
+```
+- [ ] Precision assessment
+- [ ] Split solvement
+```
+
 ### Other information:
 
 Additional information can be obtained from our code comments.
