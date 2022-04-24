@@ -13,6 +13,7 @@ opencv-python
 scipy
 matplotlib
 gdal
+matlab
 ```
 
 ### Arguments:
