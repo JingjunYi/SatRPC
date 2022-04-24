@@ -6,7 +6,6 @@ time = load(inpath);
 for i = 1:L
     dcm = dcmeci2ecef('IAU-2000/2006', time(i, :));
     line_dcm = reshape(dcm', 1, []); 
-
     if i==1   
         fid = fopen(outpath, 'w');
     else
